@@ -36,6 +36,14 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         self.set_initial_orientation(yaw_center=0, yaw_random_spread=np.pi)
         self.base = self.parts["center"]
 
+    def move_robot(self, init_x, init_y, init_z):
+        "Used by multiplayer stadium to move sideways, to another running lane."
+        self.cpp_robot.query_position()
+        pose = self.cpp_robot.root_part.pose()
+        pose.move_xyz(init_x, init_y, init_z)  # Works because robot loads around (0,0,0), and some robots have z != 0 that is left intact
+        self.cpp_robot.set_pose(pose)
+        self.start_pos_x, self.start_pos_y, self.start_pos_z = init_x, init_y, init_z
+
     def set_initial_orientation(self, yaw_center, yaw_random_spread):
         cpose = cpp_household.Pose()
         if not self.random_yaw:
@@ -43,7 +51,7 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         else:
             yaw = yaw_center + self.np_random.uniform(low=-yaw_random_spread, high=yaw_random_spread)
 
-        cpose.set_xyz(self.start_pos_x, self.start_pos_y, self.start_pos_z + 1.0)
+        cpose.set_xyz(self.start_pos_x, self.start_pos_y, self.start_pos_z + 1.5)
         cpose.set_rpy(0, 0, yaw)  # just face random direction, but stay straight otherwise
         self.cpp_robot.set_pose_and_speed(cpose, 0,0,0)
         self.initial_z = 1.5
@@ -137,7 +145,7 @@ class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
     def alive_bonus(self):
         x,y,z = self.base.pose().xyz()
 
-        if z > 0 and z < 5:
+        if z > 1 and z < 5:
             return 1
         else:
-            return 0
+            return -1
