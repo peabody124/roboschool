@@ -40,7 +40,7 @@ ifeq ($(UNAME),Darwin)
   endif
   PKG   =pkg-config
   LIBS  =-framework OpenGL
-  INC   =-I/System/Library/Frameworks/OpenGL.framework/Headers
+  INC   =-I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/usr/local/include
   BOOST_PYTHON3_POSTFIX = 3
   BOOST_MT=-mt
   PYTHON = $(shell python3 -c "import sys; print('%i.%i' % sys.version_info[:2])")
@@ -49,7 +49,7 @@ endif
 
 $(info Link against python $(PYTHON))
 INC     += `$(PKG) --cflags Qt5Widgets Qt5OpenGL assimp python-$(PYTHON)`
-LIBS    += -lstdc++ `$(PKG) --libs Qt5OpenGL Qt5Widgets assimp python-$(PYTHON)`
+LIBS    += -lstdc++ `$(PKG) --libs Qt5OpenGL Qt5Widgets tinyxml assimp python-$(PYTHON)`
 INC     += -Ibullet_local_install/include -Ibullet_local_install/include/bullet -I/usr/local/include/bullet
 LIBS    += $(RPATH) -Lbullet_local_install/lib -lLinearMath -lBullet3Common -lBulletCollision -lBulletDynamics -lBulletInverseDynamics -lPhysicsClientC_API
 
