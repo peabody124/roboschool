@@ -102,3 +102,13 @@ from roboschool.gym_humanoid_flagrun import RoboschoolHumanoidFlagrun
 from roboschool.gym_humanoid_flagrun import RoboschoolHumanoidFlagrunHarder
 from roboschool.gym_atlas import RoboschoolAtlasForwardWalk
 from roboschool.gym_pong import RoboschoolPong
+
+# Quadcopter
+
+register(
+    id='RoboschoolQuadcopterHover-v0',
+    entry_point='roboschool:RoboschoolQuadcopterHover',
+    max_episode_steps=1000
+    )
+
+from roboschool.gym_quadcopter import RoboschoolQuadcopterHover
