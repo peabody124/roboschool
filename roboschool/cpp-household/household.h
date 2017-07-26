@@ -176,6 +176,8 @@ struct World: boost::enable_shared_from_this<World> {
 	void load_robot_joints(const shared_ptr<Robot>& robot, const std::string& origin_fn);
 
 	void robot_move(const shared_ptr<Robot>& robot, const btTransform& tr, const btVector3& speed);
+	void robot_external_force(const shared_ptr<Robot>& robot, const btVector3& force);
+	void robot_external_torque(const shared_ptr<Robot>& robot, const btVector3& torque);
 
 	shared_ptr<Thingy> debug_rect(btScalar x1, btScalar y1, btScalar x2, btScalar y2, btScalar h, uint32_t color);
 	shared_ptr<Thingy> debug_line(btScalar x1, btScalar y1, btScalar z1, btScalar x2, btScalar y2, btScalar z2, uint32_t color);

@@ -593,6 +593,46 @@ void World::robot_move(const shared_ptr<Robot>& robot, const btTransform& tr, co
 	b3SubmitClientCommandAndWaitStatus(client, cmd);
 }
 
+/**
+ * Apply force to the robot in robot reference frame
+ */
+void World::robot_external_force(const shared_ptr<Robot>& robot, const btVector3& force)
+{
+	// First need to get the body pose and rotate force into this pose
+	btQuaternion angle = robot->root_part->bullet_position.getRotation();
+	btVector3 rotatedForce = quatRotate(angle, force);
+
+	double tmp[3];
+	tmp[0] = rotatedForce[0];
+	tmp[1] = rotatedForce[1];
+	tmp[2] = rotatedForce[2];
+
+	double position[3] = {0,0,0};
+
+	b3SharedMemoryCommandHandle cmd = b3ApplyExternalForceCommandInit(client);
+	b3ApplyExternalForce(cmd, robot->bullet_handle, robot->root_part->bullet_handle, tmp, position, EF_LINK_FRAME);
+	b3SubmitClientCommandAndWaitStatus(client, cmd);
+}
+
+/*
+ * Apply torque to the robot in robot reference frame
+ */
+void World::robot_external_torque(const shared_ptr<Robot>& robot, const btVector3& torque)
+{
+	// First need to get the body pose and rotate torque into this pose
+	btQuaternion angle = robot->root_part->bullet_position.getRotation();
+	btVector3 rotatedTorque = quatRotate(angle, torque);
+
+	double tmp[3];
+	tmp[0] = rotatedTorque[0];
+	tmp[1] = rotatedTorque[1];
+	tmp[2] = rotatedTorque[2];
+
+	b3SharedMemoryCommandHandle cmd = b3ApplyExternalForceCommandInit(client);
+	b3ApplyExternalTorque(cmd, robot->bullet_handle, robot->root_part->bullet_handle, tmp, EF_LINK_FRAME);
+	b3SubmitClientCommandAndWaitStatus(client, cmd);
+}
+
 std::list<shared_ptr<Household::Thingy>> World::bullet_contact_list(const shared_ptr<Thingy>& t)
 {
 	b3SharedMemoryCommandHandle cmd = b3InitRequestContactPointInformation(client);

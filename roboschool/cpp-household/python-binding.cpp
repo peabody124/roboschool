@@ -286,6 +286,8 @@ struct Robot {
 	void query_position()  { wref->query_body_position(rref); } // necessary for robot that is just created, before any step() done
 	void set_pose(const Pose& p)  { wref->robot_move(rref, p.convert_to_bt_transform(), btVector3(0,0,0)); }
 	void set_pose_and_speed(const Pose& p, float vx, float vy, float vz)  { wref->robot_move(rref, p.convert_to_bt_transform(), btVector3(vx,vy,vz)); }
+	void apply_external_force(float vx, float vy, float vz) { wref->robot_external_force(rref, btVector3(vx,vy,vz)); }
+	void apply_external_torque(float vx, float vy, float vz) { wref->robot_external_torque(rref, btVector3(vx,vy,vz)); }
 	//void replace_texture(const std::string& material_name, const std::string& new_jpeg_png)  { rref->replace_texture(material_name, new_jpeg_png); }
 };
 
@@ -671,6 +673,8 @@ void cpp_household_init()
 	.def("set_pose", &Robot::set_pose)
 	.def("set_pose_and_speed", &Robot::set_pose_and_speed)
 	.def("query_position", &Robot::query_position)
+	.def("apply_external_force", &Robot::apply_external_force)
+	.def("apply_external_torque", &Robot::apply_external_torque)
 	//.def("replace_texture", &Robot::replace_texture)
 	;
 
