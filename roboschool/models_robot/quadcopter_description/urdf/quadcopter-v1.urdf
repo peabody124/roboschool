@@ -1,30 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <robot name="quadcopter">
+
+   <material name="blue">
+      <color rgba="0 0 0.8 1"/>
+   </material>
+
+   <material name="red">
+      <color rgba="0.8 0 0 1"/>
+   </material>
+
    <link name="base_link">
+      <inertial>
+         <mass value="1.0"/> <!-- weirdly it does not work if this doesn't have mass -->
+         <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
+      </inertial>
+   </link>
+   <link name="center">
       <visual>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <box size="0.4 0.2 0.04" />
+            <box size="0.2 0.1 0.04" />
          </geometry>
       </visual>
       <collision>
          <origin xyz="0 0 0" rpy="0 0 0" />
          <geometry>
-            <box size="0.4 0.04 0.04" />
+            <box size="0.2 0.1 0.04" />
          </geometry>
       </collision>
-      <inertial>
-         <mass value="1.0"/>
-         <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
-      </inertial>
-   </link>
-   <link name="center">
-      <visual>
-         <origin xyz="0.0 0.0 0" rpy="0 0 0" />
-         <geometry>
-            <cylinder length="0.01" radius="0.01" />
-         </geometry>
-      </visual>
       <inertial>
          <mass value="0.2" />
          <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
@@ -34,13 +37,14 @@
       <visual>
          <origin xyz="0.16 0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
+         <material name="red"/>
       </visual>
       <collision>
          <origin xyz="0.16 0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
       </collision>
       <inertial>
@@ -52,13 +56,14 @@
       <visual>
          <origin xyz="0.16 -0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
+         <material name="red"/>
       </visual>
       <collision>
          <origin xyz="0.16 -0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
       </collision>
       <inertial>
@@ -68,15 +73,16 @@
    </link>
    <link name="BL">
       <visual>
-         <origin xyz="-0.09 0.13 0" rpy="0 0 0" />
+         <origin xyz="-0.16 0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
+         <material name="blue"/>
       </visual>
       <collision>
-         <origin xyz="-0.09 0.13 0" rpy="0 0 0" />
+         <origin xyz="-0.16 0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
       </collision>
       <inertial>
@@ -86,15 +92,16 @@
    </link>
    <link name="BR">
       <visual>
-         <origin xyz="-0.09 -0.13 0" rpy="0 0 0" />
+         <origin xyz="-0.16 -0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
+         <material name="blue"/>
       </visual>
       <collision>
-         <origin xyz="-0.09 -0.13 0" rpy="0 0 0" />
+         <origin xyz="-0.16 -0.13 0" rpy="0 0 0" />
          <geometry>
-            <cylinder length="0.03" radius="0.13" />
+            <cylinder length="0.03" radius="0.10" />
          </geometry>
       </collision>
       <inertial>
@@ -109,19 +116,19 @@
       <child link="center" />
    </joint>
    <joint name="base_to_FL" type="fixed">
-      <parent link="center" />
+      <parent link="base_link" />
       <child link="FL" />
    </joint>
    <joint name="base_to_FR" type="fixed">
-      <parent link="center" />
+      <parent link="base_link" />
       <child link="FR" />
    </joint>
    <joint name="base_to_BL" type="fixed">
-      <parent link="center" />
+      <parent link="base_link" />
       <child link="BL" />
    </joint>
    <joint name="base_to_BR" type="fixed">
-      <parent link="center" />
+      <parent link="base_link" />
       <child link="BR" />
    </joint>
 </robot>
