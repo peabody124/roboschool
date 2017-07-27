@@ -73,8 +73,10 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         # state is just concatenation of position and orientation
         # can later augment with additional information like velocities
         # and rotational moments. can additional corrupt with noise.
-        state = np.concatenate((self.base.pose().xyz(), self.base.pose().quatertion(), self.base.speed(), self.base.angular_speed()))
-        # print("State: {}".format(state))
+
+        # TODO: angular_speed is in world frame, need to convert to body frame
+        state = np.concatenate((self.base.pose().xyz(), self.base.pose().rpy(), self.base.speed(), self.base.angular_speed()))
+
         return state
 
     def _step(self, a):
@@ -155,10 +157,41 @@ class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
 
     def __init__(self):
         RoboschoolQuadcopterBase.__init__(self)
-    def alive_bonus(self):
-        x,y,z = self.base.pose().xyz()
 
-        if z > 1 and z < 5:
-            return 1
-        else:
+    def alive_bonus(self):
+
+        state = self.calc_state()
+        z = state[2]
+
+        if z < 1 or z > 5:
+            # quit if it is flying away or crashing
+            print("Flying away")
             return -1
+
+        desired_position = np.array([0,0,2.5])
+        desired_rpy = np.array([0,0,0])
+        desired_speed = np.array([0,0,0])
+        desired_angular_speed = np.array([0,0,0])
+
+        desired_state = np.concatenate((desired_position, desired_rpy, desired_speed, desired_angular_speed))
+
+        pos_weight = 1
+        rpy_weight = 0
+        speed_weight = 1
+        angular_speed_weight = 0
+
+        desired_weights = np.array([pos_weight, pos_weight, pos_weight,
+            rpy_weight, rpy_weight, 0,
+            speed_weight, speed_weight, speed_weight,
+            angular_speed_weight, angular_speed_weight, 0])
+
+        # compute the squared error for each state and then the weighted sum of them
+        state_error_sq = np.square(state - desired_state)
+        weighted_error = np.sum(np.multiply(desired_weights, state_error_sq))
+
+        reward = 100 - weighted_error
+
+        if reward < 0:
+            print("Far from desired state")
+
+        return reward
