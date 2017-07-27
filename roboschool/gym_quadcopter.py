@@ -12,7 +12,7 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         RoboschoolUrdfEnv.__init__(self,
             "quadcopter_description/urdf/quadcopter-v1.urdf",
             "center",
-            action_dim=4, obs_dim=6,
+            action_dim=4, obs_dim=12,
             fixed_base=False,
             self_collision=False)
 
@@ -112,13 +112,13 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         self.camera_simple_follow()
 
     def camera_simple_follow(self):
-        x, y, z = self.body_xyz
+        x, y, z = self.base.pose().xyz()
         self.camera_x = 0.98*self.camera_x + (1-0.98)*x
         self.camera.move_and_look_at(self.camera_x, y-2.0, 1.4, x, y, 1.0)
 
     def camera_dramatic(self):
-        pose = self.robot_body.pose()
-        speed = self.robot_body.speed()
+        pose = self.base.pose()
+        speed = self.base.speed()
         x, y, z = pose.xyz()
         if 1:
             camx, camy, camz = speed[0], speed[1], 2.2
@@ -165,7 +165,7 @@ class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
 
         if z < 1 or z > 5:
             # quit if it is flying away or crashing
-            print("Flying away")
+            #print("Flying away")
             return -1
 
         desired_position = np.array([0,0,2.5])
@@ -176,14 +176,14 @@ class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
         desired_state = np.concatenate((desired_position, desired_rpy, desired_speed, desired_angular_speed))
 
         pos_weight = 1
-        rpy_weight = 0
+        rpy_weight = 1
         speed_weight = 1
-        angular_speed_weight = 0
+        angular_speed_weight = 1
 
         desired_weights = np.array([pos_weight, pos_weight, pos_weight,
-            rpy_weight, rpy_weight, 0,
+            rpy_weight, rpy_weight, rpy_weight,
             speed_weight, speed_weight, speed_weight,
-            angular_speed_weight, angular_speed_weight, 0])
+            angular_speed_weight, angular_speed_weight, angular_speed_weight])
 
         # compute the squared error for each state and then the weighted sum of them
         state_error_sq = np.square(state - desired_state)
@@ -191,7 +191,7 @@ class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
 
         reward = 100 - weighted_error
 
-        if reward < 0:
-            print("Far from desired state")
+        #if reward < 0:
+        #    print("Far from desired state")
 
         return reward
