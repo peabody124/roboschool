@@ -21,6 +21,7 @@ def demo_run():
         obs = env.reset()
 
         a = np.zeros(4,)
+        a[3] = 0.5
 
         while 1:
 

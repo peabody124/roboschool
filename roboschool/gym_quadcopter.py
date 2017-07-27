@@ -22,14 +22,27 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         self.camera_z = 45.0
         self.camera_follow = 0
 
+        self.count = 0
+
+    MASS = 2
+    GRAV = 9.8
+    TORQUE_SCALE = 0.05
+
     def create_single_player_scene(self):
-        return SinglePlayerStadiumScene(gravity=9.8, timestep=0.0165/8, frame_skip=8)   # 8 instead of 4 here
+        return SinglePlayerStadiumScene(gravity=self.GRAV, timestep=0.0165/8, frame_skip=8)   # 8 instead of 4 here
 
     def apply_action(self, a):
         assert( np.isfinite(a).all() )
 
-        # TODO: implement quadcopter physics here
-        # ? how to use bullet
+        # the first three parameters are the roll, pitch and yaw signals to command. 
+        # we apply a scale to go from teh command signals (0,1) to the torque range
+        # which will then be filtered by the moment of inertia of the fram
+        self.cpp_robot.apply_external_torque(self.TORQUE_SCALE * a[0], self.TORQUE_SCALE * a[1], self.TORQUE_SCALE * a[2])
+
+        # the third parameter is throttle (from 0, 1) with full
+        # throttle corresponding to 2 masses worth of force
+        self.cpp_robot.apply_external_force(0,0,self.GRAV*self.MASS*2*a[3])
+
 
     def robot_specific_reset(self):
         self.scene.actor_introduce(self)
@@ -57,12 +70,12 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         self.initial_z = 1.5
 
     def calc_state(self):
-    	# state is just concatenation of position and orientation
-    	# can later augment with additional information like velocities
-    	# and rotational moments. can additional corrupt with noise.
-    	state = np.concatenate((self.base.pose().xyz(), self.base.pose().quatertion()))
-    	#print("State: {}".format(state))
-    	return state
+        # state is just concatenation of position and orientation
+        # can later augment with additional information like velocities
+        # and rotational moments. can additional corrupt with noise.
+        state = np.concatenate((self.base.pose().xyz(), self.base.pose().quatertion(), self.base.speed(), self.base.angular_speed()))
+        # print("State: {}".format(state))
+        return state
 
     def _step(self, a):
         if not self.scene.multiplayer:  # if multiplayer, action first applied to all robots, then global step() called, then _step() for all robots with the same actions
