@@ -114,7 +114,7 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
     def camera_simple_follow(self):
         x, y, z = self.base.pose().xyz()
         self.camera_x = 0.98*self.camera_x + (1-0.98)*x
-        self.camera.move_and_look_at(self.camera_x, y-2.0, 1.4, x, y, 1.0)
+        self.camera.move_and_look_at(self.camera_x, y-5.0, 4, x, y, z)
 
     def camera_dramatic(self):
         pose = self.base.pose()
