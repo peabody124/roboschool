@@ -6,13 +6,14 @@ from roboschool.scene_stadium import SinglePlayerStadiumScene
 import numpy as np
 
 class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
-    random_yaw = False
+    random_yaw = True
+    random_attitude = True
 
     def __init__(self):
         RoboschoolUrdfEnv.__init__(self,
             "quadcopter_description/urdf/quadcopter-v1.urdf",
             "center",
-            action_dim=4, obs_dim=12,
+            action_dim=4, obs_dim=13,
             fixed_base=False,
             self_collision=False)
 
@@ -39,14 +40,15 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         # which will then be filtered by the moment of inertia of the fram
         self.cpp_robot.apply_external_torque(self.TORQUE_SCALE * a[0], self.TORQUE_SCALE * a[1], self.TORQUE_SCALE * a[2])
 
-        # the third parameter is throttle (from 0, 1) with full
-        # throttle corresponding to 2 masses worth of force
-        self.cpp_robot.apply_external_force(0,0,self.GRAV*self.MASS*2*a[3])
+        # the third parameter is throttle (from -1, 1) which we shift to (0,1) with
+        # full throttle corresponding to 2 masses worth of force
+        throttle = 0.5 + 0.5 * a[3]
+        self.cpp_robot.apply_external_force(0,0,self.GRAV*self.MASS*2*throttle)
 
 
     def robot_specific_reset(self):
         self.scene.actor_introduce(self)
-        self.set_initial_orientation(yaw_center=0, yaw_random_spread=np.pi)
+        self.set_initial_orientation(yaw_center=np.pi, yaw_random_spread=np.pi)
         self.base = self.parts["center"]
 
     def move_robot(self, init_x, init_y, init_z):
@@ -57,15 +59,22 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         self.cpp_robot.set_pose(pose)
         self.start_pos_x, self.start_pos_y, self.start_pos_z = init_x, init_y, init_z
 
-    def set_initial_orientation(self, yaw_center, yaw_random_spread):
+    def set_initial_orientation(self, yaw_center, yaw_random_spread=np.pi, attitude_random_spread=np.pi/6.0):
         cpose = cpp_household.Pose()
         if not self.random_yaw:
             yaw = yaw_center
         else:
             yaw = yaw_center + self.np_random.uniform(low=-yaw_random_spread, high=yaw_random_spread)
 
+        if not self.random_attitude:
+            roll = 0.0
+            pitch = 0.0
+        else:
+            roll = self.np_random.uniform(low=-attitude_random_spread, high=attitude_random_spread)
+            pitch = self.np_random.uniform(low=-attitude_random_spread, high=attitude_random_spread)
+
         cpose.set_xyz(self.start_pos_x, self.start_pos_y, self.start_pos_z + 1.5)
-        cpose.set_rpy(0, 0, yaw)  # just face random direction, but stay straight otherwise
+        cpose.set_rpy(roll, pitch, yaw)  # just face random direction, but stay straight otherwise
         self.cpp_robot.set_pose_and_speed(cpose, 0,0,0)
         self.initial_z = 1.5
 
@@ -75,7 +84,12 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         # and rotational moments. can additional corrupt with noise.
 
         # TODO: angular_speed is in world frame, need to convert to body frame
-        state = np.concatenate((self.base.pose().xyz(), self.base.pose().rpy(), self.base.speed(), self.base.angular_speed()))
+        rpy = self.base.pose().rpy()
+
+        # Reproject yaw into cos, sin components to make this smooth at
+        # 180 deg discontinuity by having inputs on a smaller manifold
+        rpyy = np.array([rpy[0], rpy[1], np.cos(rpy[2]), np.sin(rpy[2])])
+        state = np.concatenate((self.base.pose().xyz(),rpyy, self.base.speed(), self.base.angular_speed()))
 
         return state
 
@@ -169,11 +183,11 @@ class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
             return -1
 
         desired_position = np.array([0,0,2.5])
-        desired_rpy = np.array([0,0,0])
+        desired_rpyy = np.array([0,0,1,0])
         desired_speed = np.array([0,0,0])
         desired_angular_speed = np.array([0,0,0])
 
-        desired_state = np.concatenate((desired_position, desired_rpy, desired_speed, desired_angular_speed))
+        desired_state = np.concatenate((desired_position, desired_rpyy, desired_speed, desired_angular_speed))
 
         pos_weight = 1
         rpy_weight = 1
@@ -181,7 +195,7 @@ class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
         angular_speed_weight = 1
 
         desired_weights = np.array([pos_weight, pos_weight, pos_weight,
-            rpy_weight, rpy_weight, rpy_weight,
+            rpy_weight, rpy_weight, rpy_weight, rpy_weight,
             speed_weight, speed_weight, speed_weight,
             angular_speed_weight, angular_speed_weight, angular_speed_weight])
 
