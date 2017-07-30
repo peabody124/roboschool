@@ -8,6 +8,8 @@ import numpy as np
 class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
     random_yaw = True
     random_attitude = True
+    random_speed = True
+    random_position = True
 
     def __init__(self):
         RoboschoolUrdfEnv.__init__(self,
@@ -17,7 +19,6 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
             fixed_base=False,
             self_collision=False)
 
-        self.start_pos_x, self.start_pos_y, self.start_pos_z = 0, 0, 0
         self.camera_x = 0
         self.camera_y = 4.3
         self.camera_z = 45.0
@@ -59,7 +60,8 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         self.cpp_robot.set_pose(pose)
         self.start_pos_x, self.start_pos_y, self.start_pos_z = init_x, init_y, init_z
 
-    def set_initial_orientation(self, yaw_center, yaw_random_spread=np.pi, attitude_random_spread=np.pi/6.0):
+    def set_initial_orientation(self, yaw_center, yaw_random_spread=np.pi,
+        attitude_random_spread=np.pi/6.0, speed_random_spread=5, position_random_spread=2):
         cpose = cpp_household.Pose()
         if not self.random_yaw:
             yaw = yaw_center
@@ -73,10 +75,25 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
             roll = self.np_random.uniform(low=-attitude_random_spread, high=attitude_random_spread)
             pitch = self.np_random.uniform(low=-attitude_random_spread, high=attitude_random_spread)
 
-        cpose.set_xyz(self.start_pos_x, self.start_pos_y, self.start_pos_z + 1.5)
+        if not self.random_speed:
+            speed_x = 0.0
+            speed_y = 0.0
+        else:
+            speed_x = self.np_random.uniform(low=-speed_random_spread, high=speed_random_spread)
+            speed_y = self.np_random.uniform(low=-speed_random_spread, high=speed_random_spread)
+
+        if not self.random_position:
+            start_pos_x = 0.0
+            start_pos_y = 0.0
+            start_pos_z = 0.0
+        else:
+            start_pos_x = self.np_random.uniform(low=-position_random_spread, high=position_random_spread)
+            start_pos_y = self.np_random.uniform(low=-position_random_spread, high=position_random_spread)
+            start_pos_z = 2.5 + self.np_random.uniform(low=-1.5, high=2.5)
+
+        cpose.set_xyz(start_pos_x, start_pos_y, start_pos_z)
         cpose.set_rpy(roll, pitch, yaw)  # just face random direction, but stay straight otherwise
-        self.cpp_robot.set_pose_and_speed(cpose, 0,0,0)
-        self.initial_z = 1.5
+        self.cpp_robot.set_pose_and_speed(cpose, speed_x, speed_y, 0)
 
     def calc_state(self):
         # state is just concatenation of position and orientation
