@@ -108,7 +108,14 @@ from roboschool.gym_pong import RoboschoolPong
 register(
     id='RoboschoolQuadcopterHover-v0',
     entry_point='roboschool:RoboschoolQuadcopterHover',
-    max_episode_steps=1000
+    max_episode_steps=500,
+    kwargs={'position_weight': 1.0, 'velocity_weight': 0.0, 'angle_weight': 0.0, 'angular_speed_weight': 0.0},
     )
 
-from roboschool.gym_quadcopter import RoboschoolQuadcopterHover
+register(
+    id='RoboschoolQuadcopterChase-v0',
+    entry_point='roboschool:RoboschoolQuadcopterChase',
+    max_episode_steps=5000
+    )
+
+from roboschool.gym_quadcopter import RoboschoolQuadcopterHover, RoboschoolQuadcopterChase

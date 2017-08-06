@@ -6,30 +6,53 @@ from roboschool.scene_stadium import SinglePlayerStadiumScene
 import numpy as np
 
 class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
-    random_yaw = True
-    random_attitude = True
-    random_speed = True
-    random_position = True
 
-    random_target = True
+    STATE_DIM = 16
 
-    # create measurement noise
-    position_noise = np.ones(3,) * 0.1
-    attitude_noise = np.array([np.pi / 10.0, np.pi / 10.0, 0.01, 0.01])
-    speed_noise    = np.ones(3,) * 0.1
-    angular_speed_noise = np.ones(3,) * 0.1
-    sensor_noise = np.concatenate(( position_noise,
-                                    attitude_noise,
-                                    speed_noise,
-                                    angular_speed_noise))
-
-    def __init__(self):
+    def __init__(self,
+        position_weight=1.0, 
+        velocity_weight=1.0,
+        angle_weight=1.0,
+        angular_speed_weight=1.0,
+        position_noise=0.0,
+        velocity_noise=0.0,
+        angle_noise=0.0,
+        angular_speed_noise=0.0,
+        random_yaw=True,
+        random_attitude=True,
+        random_velocity=True,
+        random_position=True,
+        random_target=True,
+        flag_timeout=1000
+        ):
         RoboschoolUrdfEnv.__init__(self,
             "quadcopter_description/urdf/quadcopter-v1.urdf",
             "center",
-            action_dim=4, obs_dim=16,
+            action_dim=4, obs_dim=self.STATE_DIM,
             fixed_base=False,
             self_collision=False)
+
+        # compute weight vector for rewards
+        self.desired_weights = np.array([position_weight, position_weight, position_weight,
+            angle_weight, angle_weight, angle_weight, angle_weight,
+            velocity_weight, velocity_weight, velocity_weight,
+            angular_speed_weight, angular_speed_weight, angular_speed_weight])
+
+        # and the amount of sensor noise to simulate
+        self.sensor_noise = np.array([position_noise, position_noise, position_noise,
+            angle_noise, angle_noise, 0.0, 0.0,
+            velocity_noise, velocity_noise, velocity_noise,
+            angular_speed_noise, angular_speed_noise, angular_speed_noise])
+        self.yaw_sensor_noise = angle_noise;  # note we need this separately because of yaw representation
+
+        # store parameters about randomization on reset
+        self.random_yaw = random_yaw
+        self.random_attitude = random_attitude
+        self.random_velocity = random_velocity
+        self.random_position = random_position
+        self.random_target = random_target
+
+        self.flag_timeout_init = flag_timeout
 
         self.camera_x = 0
         self.camera_y = 4.3
@@ -94,7 +117,7 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
             roll = self.np_random.uniform(low=-attitude_random_spread, high=attitude_random_spread)
             pitch = self.np_random.uniform(low=-attitude_random_spread, high=attitude_random_spread)
 
-        if not self.random_speed:
+        if not self.random_velocity:
             speed_x = 0.0
             speed_y = 0.0
         else:
@@ -104,7 +127,7 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         if not self.random_position:
             start_pos_x = 0.0
             start_pos_y = 0.0
-            start_pos_z = 0.0
+            start_pos_z = 2.5
         else:
             start_pos_x = self.np_random.uniform(low=-position_random_spread, high=position_random_spread)
             start_pos_y = self.np_random.uniform(low=-position_random_spread, high=position_random_spread)
@@ -124,7 +147,7 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
 
         self.flag = None
         self.flag = self.scene.cpp_world.debug_sphere(self.target_x, self.target_y, self.target_z, 0.2, 0xFF8080)
-        self.flag_timeout = 600/self.scene.frame_skip
+        self.flag_timeout = self.flag_timeout_init
 
     def calc_state(self):
         # state is just concatenation of position and orientation
@@ -137,16 +160,17 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
 
         # Reproject yaw into cos, sin components to make this smooth at
         # 180 deg discontinuity by having inputs on a smaller manifold
-        rpyy = np.array([rpy[0], rpy[1], np.cos(rpy[2]), np.sin(rpy[2])])
+        yaw_noise = np.random.normal(size=(1,)) * self.yaw_sensor_noise
+        rpyy = np.array([rpy[0], rpy[1], np.cos(rpy[2] + yaw_noise), np.sin(rpy[2] + yaw_noise)])
         state = np.concatenate((xyz,rpyy, self.base.speed(), self.base.angular_speed()))
 
         # add state noise
-        noise = np.multiply(np.random.normal(size=(13,)), self.sensor_noise)
+        noise = np.multiply(np.random.normal(size=(self.STATE_DIM-3,)), self.sensor_noise)
         state += noise
 
         self.target_distance = ((self.target_x - xyz[0]) ** 2.0 + (self.target_y - xyz[1]) ** 2.0) ** 0.5
         self.flag_timeout -= 1
-        if (self.target_distance < 0.1 or self.flag_timeout <= 0) and self.random_target:
+        if (self.target_distance < 1.0 or self.flag_timeout <= 0) and self.random_target:
             self.flag_reposition()
 
         state = np.concatenate((state, np.array([self.target_x, self.target_y, self.target_z])))
@@ -160,7 +184,7 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
 
         state = self.calc_state()  # also calculates self.joints_at_limit
 
-        alive = float(self.alive_bonus())   # state[0] is body height above ground, body_rpy[1] is pitch
+        alive = float(self.alive_bonus(state))   # state[0] is body height above ground, body_rpy[1] is pitch
         done = alive < 0
         if not np.isfinite(state).all():
             print("~INF~", state)
@@ -177,6 +201,36 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
         self.reward += sum(self.rewards)
         self.HUD(state, a, done)
         return state, sum(self.rewards), bool(done), {}
+
+    def alive_bonus(self, state):
+        z = state[2]
+
+        # split state into a target component and the actual state. it is represented this
+        # way so that the network knows the desired state
+        desired_position = state[-3:] # for this should always be zero
+        state = state[:-3]
+
+        desired_rpyy = np.array([0,0,1,0])
+        desired_speed = np.array([0,0,0])
+        desired_angular_speed = np.array([0,0,0])
+
+        desired_state = np.concatenate((desired_position, desired_rpyy, desired_speed, desired_angular_speed))
+
+        if z <= 0.5 or z > 5:
+            # quit if it is flying away or crashing
+            #print("Flying away")
+            return -1
+
+        # compute the squared error for each state and then the weighted sum of them
+        state_error_sq = np.square(state - desired_state)
+        weighted_error = np.sum(np.multiply(self.desired_weights, state_error_sq))
+
+        reward = 100 - weighted_error
+
+        #if reward < 0:
+        #    print("Far from desired state")
+
+        return reward
 
     def episode_over(self, frames):
         pass
@@ -229,47 +283,12 @@ class RoboschoolQuadcopterBase(SharedMemoryClientEnv, RoboschoolUrdfEnv):
 
 class RoboschoolQuadcopterHover(RoboschoolQuadcopterBase):
 
-    def __init__(self):
-        RoboschoolQuadcopterBase.__init__(self)
+    def __init__(self, **kwargs):
+        RoboschoolQuadcopterBase.__init__(self, random_target=False, **kwargs)
 
-    def alive_bonus(self):
+class RoboschoolQuadcopterChase(RoboschoolQuadcopterBase):
 
-        state = self.calc_state()
-        z = state[2]
+    def __init__(self, **kwargs):
+        RoboschoolQuadcopterBase.__init__(self, random_target=True, **kwargs)
 
-        # split state into a target component and the actual state. it is represented this
-        # way so that the network knows the desired state
-        desired_position = state[-3:]
-        state = state[:-3]
 
-        if z <= 0.5 or z > 5:
-            # quit if it is flying away or crashing
-            #print("Flying away")
-            return -1
-
-        desired_rpyy = np.array([0,0,1,0])
-        desired_speed = np.array([0,0,0])
-        desired_angular_speed = np.array([0,0,0])
-
-        desired_state = np.concatenate((desired_position, desired_rpyy, desired_speed, desired_angular_speed))
-
-        pos_weight = 0.1
-        rpy_weight = 1
-        speed_weight = 1
-        angular_speed_weight = 1
-
-        desired_weights = np.array([pos_weight, pos_weight, pos_weight,
-            rpy_weight, rpy_weight, rpy_weight, rpy_weight,
-            speed_weight, speed_weight, speed_weight,
-            angular_speed_weight, angular_speed_weight, angular_speed_weight])
-
-        # compute the squared error for each state and then the weighted sum of them
-        state_error_sq = np.square(state - desired_state)
-        weighted_error = np.sum(np.multiply(desired_weights, state_error_sq))
-
-        reward = 100 - weighted_error
-
-        #if reward < 0:
-        #    print("Far from desired state")
-
-        return reward
