@@ -7,14 +7,12 @@ import subprocess
 import threading
 import json
 
-from baselines.common.mpi_fork import mpi_fork
 from baselines import logger
+from baselines.common import tf_util as U
+from baselines.common.misc_util import set_global_seeds, boolean_flag, SimpleMonitor
+from baselines.common.mpi_fork import mpi_fork
 from baselines.logger import Logger
-from baselines.common.misc_util import (
-    set_global_seeds,
-    boolean_flag,
-    SimpleMonitor
-)
+
 import baselines.ddpg.training as training
 from baselines.ddpg.models import Actor, Critic
 from baselines.ddpg.memory import Memory
@@ -33,23 +31,27 @@ def run(env_id, seed, noise_type, num_cpu, layer_norm, logdir, gym_monitor, eval
 
     assert not (gym_monitor and evaluation), "Unfortunately trying to monitor both training and testing with video writing causes a segfault"
 
+    # currently doesn't work unless environment works natively from bash
     kwargs['logdir'] = logdir
-    whoami = mpi_fork(num_cpu, bind_to_core=bind_to_core)
-    if whoami == 'parent':
-        sys.exit(0)
+    #whoami = mpi_fork(num_cpu, bind_to_core=bind_to_core)
+    #if whoami == 'parent':
+    #    sys.exit(0)
 
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
-    if rank != 0:
-        # Write to temp directory for all non-master workers.
-        actual_dir = None
-        Logger.CURRENT.close()
-        Logger.CURRENT = Logger(dir=mkdtemp(), output_formats=[])
-        logger.set_level(logger.DISABLED)
-    else:
-        logger.session(dir=logdir).__enter__()
+    #if rank != 0:
+    #    # Write to temp directory for all non-master workers.
+    #    actual_dir = None
+    #    Logger.CURRENT.close()
+    #    Logger.CURRENT = Logger(dir=mkdtemp(), output_formats=[])
+    #    logger.set_level(logger.DISABLED)
+    #else:
+    #    logger.session(dir=logdir).__enter__()
 
     
+    U.make_session(num_cpu=num_cpu).__enter__()
+    logger.session(dir=logdir).__enter__()
+
     # Create envs.
     if rank == 0:
         env = gym.make(env_id)
@@ -105,17 +107,13 @@ def run(env_id, seed, noise_type, num_cpu, layer_norm, logdir, gym_monitor, eval
     if eval_env is not None:
         eval_env.seed(seed)
 
-    # Disable logging for rank != 0 to avoid noise.
-    if rank == 0:
-        start_time = time.time()
+    # Train model.
     training.train(env=env, eval_env=eval_env, param_noise=param_noise,
         action_noise=action_noise, actor=actor, critic=critic, memory=memory, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
     Logger.CURRENT.close()
-    if rank == 0:
-        logger.info('total runtime: {}s'.format(time.time() - start_time))
 
 
 def parse_args():
@@ -125,7 +123,7 @@ def parse_args():
     boolean_flag(parser, 'render-eval', default=True)
     boolean_flag(parser, 'layer-norm', default=True)
     boolean_flag(parser, 'render', default=False)
-    parser.add_argument('--num-cpu', type=int, default=1)
+    parser.add_argument('--num-cpu', type=int, default=4)
     boolean_flag(parser, 'normalize-returns', default=False)
     boolean_flag(parser, 'normalize-observations', default=True)
     parser.add_argument('--seed', type=int, default=0)
@@ -137,11 +135,11 @@ def parse_args():
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--reward-scale', type=float, default=1.)
     parser.add_argument('--clip-norm', type=float, default=None)
-    parser.add_argument('--nb-epochs', type=int, default=500)  # with default settings, perform 1M steps total
+    parser.add_argument('--nb-epochs', type=int, default=5000)  # with default settings, perform 1M steps total
     parser.add_argument('--nb-epoch-cycles', type=int, default=20)
     parser.add_argument('--nb-train-steps', type=int, default=50)  # per epoch cycle and MPI worker
     parser.add_argument('--nb-eval-steps', type=int, default=100)  # per epoch cycle and MPI worker
-    parser.add_argument('--nb-rollout-steps', type=int, default=100)  # per epoch cycle and MPI worker
+    parser.add_argument('--nb-rollout-steps', type=int, default=4000)  # per epoch cycle and MPI worker
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--logdir', type=str, default=None)
     boolean_flag(parser, 'gym-monitor', default=True)   # indicate whether to attach a monitor
