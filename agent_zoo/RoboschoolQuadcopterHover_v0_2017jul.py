@@ -89,15 +89,33 @@ def demo_run(video=False, monitor=False):
         device_count = { "GPU": 0 } )
     sess = tf.InteractiveSession(config=config)
 
-    env = gym.make("RoboschoolQuadcopterChase-v0")
+    if True:
+        env = gym.make("RoboschoolQuadcopterHover-v0")
+    else:
+        # Create custom environment with some tweaked parameters
+        gym.envs.register(id='RoboschoolQuadcopterCustom-v0',
+                      entry_point='roboschool:RoboschoolQuadcopterHover',
+                      max_episode_steps=500,
+                      kwargs={'random_position': False, 'random_velocity': False}
+                      )
+        env = gym.make("RoboschoolQuadcopterCustom-v0")
 
     pi = ZooPolicyTensorflow("mymodel1", env.observation_space, env.action_space)
 
+    if monitor:
+        logdir = "/tmp/RoboschoolQuadcopterHover-v0/"
+        env = gym.wrappers.Monitor(env, logdir, force=True)
+        env = SimpleMonitor(env)
+
+    episode_n = 0
     while 1:
+        episode_n += 1
         frame = 0
         score = 0
         restart_delay = 0.0
         obs = env.reset()
+
+        if video: video_recorder = gym.monitoring.video_recorder.VideoRecorder(env=env, base_path=("/tmp/hover%i" % episode_n), enabled=True)
 
         while 1:
             a = pi.act(obs, env)
@@ -107,17 +125,20 @@ def demo_run(video=False, monitor=False):
             score += r
             frame += 1
             still_open = env.render("human")
+            if video: video_recorder.capture_frame()
+
             if still_open==False:
                 return
             if not done: continue
+            if done: break
             if restart_delay==0:
                 print("score=%0.2f in %i frames" % (score, frame))
                 if still_open!=True:      # not True in multiplayer or non-Roboschool environment
                     break
-                restart_delay = 60*2  # 2 sec at 60 fps
+                restart_delay = 60*0.25  # 0.25 sec at 60 fps
             restart_delay -= 1
             if restart_delay==0: break
 
 
 if __name__=="__main__":
-    demo_run(video=False, monitor=True)
+    demo_run(video=False, monitor=False)
